@@ -1,12 +1,4 @@
-pageHandlers = new Tatami.__class__.Storage "pageHandlers"
-
-handlerName = ( func ) ->
-  return func.toString().length.toString(16) + ""
-
-handlerExists = ( page, func ) ->
-  return @equal func, pageHandlers.get "#{page}.#{handlerName func}"
-
-Adaptor = 
+Tatami.extend
   handlers: [
     {
       name: "inPage"
@@ -45,8 +37,15 @@ Adaptor =
       value: false
     }
   ]
+, Tatami
 
-Tatami.extend Adaptor, Tatami
+pageHandlers = new Tatami.__class__.Storage "pageHandlers"
+
+handlerName = ( func ) ->
+  return func.toString().length.toString(16) + ""
+
+handlerExists = ( page, func ) ->
+  return @equal func, pageHandlers.get "#{page}.#{handlerName func}"
 
 # Support for turbolinks (https://github.com/rails/turbolinks)
 if @Turbolinks and @Turbolinks.supported is true
@@ -56,7 +55,7 @@ if @Turbolinks and @Turbolinks.supported is true
         "page:change": =>
           @each pageHandlers.storage[$("body").attr("data-page")], ( handler ) ->
             handler()
-            
+
           @run prepareHandlers
         "page:load": =>
           @run readyHandlers
