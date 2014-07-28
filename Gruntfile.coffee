@@ -42,7 +42,7 @@ module.exports = ( grunt ) ->
         dest: "<%= meta.dest_script %>/<%= pkg.name %>.js"
     coffee:
       options:
-        bare: true
+        bare: false
         separator: "\x20"
       build:
         src: "<%= meta.coffee %>/adaptor.coffee"
