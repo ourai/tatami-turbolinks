@@ -6,16 +6,8 @@
 
 turbolinksEnabled = @Turbolinks and @Turbolinks.supported is true
 
-Storage = Tatami.__class__.Storage
-
 # storage for page handlers
-pageHandlers = new Storage "pageHandlers"
-
-# storage for prepare handlers
-prepare = new Storage "prepareHandlers"
-
-# storage for ready handlers
-ready = new Storage "readyHandlers"
+pageHandlers = new Tatami.__class__.Storage "pageHandlers"
 
 currentPage = undefined
 
@@ -25,9 +17,8 @@ toNS = ( str ) ->
 handlerName = ( func ) ->
   return func.toString().length.toString(16) + ""
 
-handlerExists = ( host, page, func ) ->
-  name = handlerName func
-  handler = host.get "#{page}.#{name}"
+handlerExists = ( host, page, func, name ) ->
+  handler = pageHandlers.get "#{page}.#{host}.#{name}"
   existed = @equal func, handler
 
   # console.log(existed, handler, func) if existed and window.console
@@ -42,31 +33,28 @@ addHandlers = ( host, page, func, isPlain ) ->
       func = flag
       flag = idx
 
-    flag = "__GLOBAL__" if not flag?
+    flag = "unspecified" if not flag?
     flag = toNS flag
+    name = handlerName func
 
-    if not handlerExists.apply this, [host, flag, func]
-      name = handlerName func
-      
-      @namespace handlers, "#{flag}.#{name}"
+    if not handlerExists.apply this, [host, flag, func, name]
+      @namespace handlers, "#{flag}.#{host}.#{name}"
+      handlers[flag][host][name] = func
 
-      handlers[flag][name] = func
+  pageHandlers.set handlers
 
-  host.set handlers
-
+# 执行 pageHandlers 的函数
 runHandlers = ( handlers, callback ) ->
   @each handlers, ( handler ) ->
     callback() if callback
     handler()
 
-runPrepareHandlers = ->
-  runHandlers.call this, prepare.storage.__GLOBAL__
-  runHandlers.call this, prepare.storage[currentPageFlag true]
+# 执行流程控制函数
+runFlowHandlers = ( type ) ->
+  @each ["unspecified", currentPageFlag(true)], ( page ) =>
+    runHandlers.call this, pageHandlers.storage[page][type]
 
-runReadyHandlers = ->
-  runHandlers.call this, ready.storage.__GLOBAL__
-  runHandlers.call this, ready.storage[currentPageFlag true]
-
+# 执行页面指定初始化函数
 runPageHandlers = ( page, func, isPlain ) ->
   @each page, ( flag, idx ) ->
     if isPlain
@@ -100,7 +88,7 @@ Tatami.extend
 
           # 设置特定页面执行的函数
           if turbolinksEnabled
-            args.unshift pageHandlers
+            args.unshift "init"
             addHandlers.apply this, args
           # 立即执行函数
           else
@@ -119,26 +107,28 @@ Tatami.extend
 if turbolinksEnabled
   Tatami.mixin
     prepare: ( handler ) ->
-      addHandlers.call this, prepare, [currentPage], handler
+      addHandlers.call this, "prepare", [currentPage], handler
       return 
     ready: ( handler ) ->
-      addHandlers.call this, ready, [currentPage], handler
+      addHandlers.call this, "ready", [currentPage], handler
       return
 
   Tatami.init
-    runSandbox: ( prepareHandlers, readyHandlers ) ->
+    runSandbox: ->
       $(document).on 
         "page:change": =>
           console.log "change"
           page = currentPageFlag true
 
-          runHandlers.call this, pageHandlers.storage[page], ->
+          # 执行 init 函数队列
+          # 过程中会添加页面指定的 prepare、ready 函数
+          runHandlers.call this, pageHandlers.storage[page].init, ->
             currentPage = page
 
-          runPrepareHandlers.call this
+          runFlowHandlers.call this, "prepare"
         "page:load": =>
           console.log "load"
-          runReadyHandlers.call this
+          runFlowHandlers.call this, "ready"
         # "page:restore": =>
         #   console.log "restore"
-        #   runReadyHandlers.call this
+        #   runFlowHandlers.call this, "ready"

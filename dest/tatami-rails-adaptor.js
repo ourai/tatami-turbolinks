@@ -1,15 +1,9 @@
 (function() {
-  var Storage, addHandlers, currentPage, currentPageFlag, handlerExists, handlerName, pageHandlers, prepare, ready, runHandlers, runPageHandlers, runPrepareHandlers, runReadyHandlers, toNS, turbolinksEnabled;
+  var addHandlers, currentPage, currentPageFlag, handlerExists, handlerName, pageHandlers, runFlowHandlers, runHandlers, runPageHandlers, toNS, turbolinksEnabled;
 
   turbolinksEnabled = this.Turbolinks && this.Turbolinks.supported === true;
 
-  Storage = Tatami.__class__.Storage;
-
-  pageHandlers = new Storage("pageHandlers");
-
-  prepare = new Storage("prepareHandlers");
-
-  ready = new Storage("readyHandlers");
+  pageHandlers = new Tatami.__class__.Storage("pageHandlers");
 
   currentPage = void 0;
 
@@ -21,10 +15,9 @@
     return func.toString().length.toString(16) + "";
   };
 
-  handlerExists = function(host, page, func) {
-    var existed, handler, name;
-    name = handlerName(func);
-    handler = host.get("" + page + "." + name);
+  handlerExists = function(host, page, func, name) {
+    var existed, handler;
+    handler = pageHandlers.get("" + page + "." + host + "." + name);
     existed = this.equal(func, handler);
     return existed;
   };
@@ -40,17 +33,17 @@
           flag = idx;
         }
         if (flag == null) {
-          flag = "__GLOBAL__";
+          flag = "unspecified";
         }
         flag = toNS(flag);
-        if (!handlerExists.apply(_this, [host, flag, func])) {
-          name = handlerName(func);
-          _this.namespace(handlers, "" + flag + "." + name);
-          return handlers[flag][name] = func;
+        name = handlerName(func);
+        if (!handlerExists.apply(_this, [host, flag, func, name])) {
+          _this.namespace(handlers, "" + flag + "." + host + "." + name);
+          return handlers[flag][host][name] = func;
         }
       };
     })(this));
-    return host.set(handlers);
+    return pageHandlers.set(handlers);
   };
 
   runHandlers = function(handlers, callback) {
@@ -62,14 +55,12 @@
     });
   };
 
-  runPrepareHandlers = function() {
-    runHandlers.call(this, prepare.storage.__GLOBAL__);
-    return runHandlers.call(this, prepare.storage[currentPageFlag(true)]);
-  };
-
-  runReadyHandlers = function() {
-    runHandlers.call(this, ready.storage.__GLOBAL__);
-    return runHandlers.call(this, ready.storage[currentPageFlag(true)]);
+  runFlowHandlers = function(type) {
+    return this.each(["unspecified", currentPageFlag(true)], (function(_this) {
+      return function(page) {
+        return runHandlers.call(_this, pageHandlers.storage[page][type]);
+      };
+    })(this));
   };
 
   runPageHandlers = function(page, func, isPlain) {
@@ -113,7 +104,7 @@
             }
             args = [page, func, isObj];
             if (turbolinksEnabled) {
-              args.unshift(pageHandlers);
+              args.unshift("init");
               addHandlers.apply(this, args);
             } else {
               runPageHandlers.apply(this, args);
@@ -132,30 +123,30 @@
   if (turbolinksEnabled) {
     Tatami.mixin({
       prepare: function(handler) {
-        addHandlers.call(this, prepare, [currentPage], handler);
+        addHandlers.call(this, "prepare", [currentPage], handler);
       },
       ready: function(handler) {
-        addHandlers.call(this, ready, [currentPage], handler);
+        addHandlers.call(this, "ready", [currentPage], handler);
       }
     });
     Tatami.init({
-      runSandbox: function(prepareHandlers, readyHandlers) {
+      runSandbox: function() {
         return $(document).on({
           "page:change": (function(_this) {
             return function() {
               var page;
               console.log("change");
               page = currentPageFlag(true);
-              runHandlers.call(_this, pageHandlers.storage[page], function() {
+              runHandlers.call(_this, pageHandlers.storage[page].init, function() {
                 return currentPage = page;
               });
-              return runPrepareHandlers.call(_this);
+              return runFlowHandlers.call(_this, "prepare");
             };
           })(this),
           "page:load": (function(_this) {
             return function() {
               console.log("load");
-              return runReadyHandlers.call(_this);
+              return runFlowHandlers.call(_this, "ready");
             };
           })(this)
         });
