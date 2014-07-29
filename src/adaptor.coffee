@@ -1,3 +1,9 @@
+##
+# ----------
+# Adaptor of Tatami for Ruby on Rails
+# ----------
+#= require tatami
+
 turbolinksEnabled = @Turbolinks and @Turbolinks.supported is true
 
 Storage = Tatami.__class__.Storage
