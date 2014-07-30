@@ -2,7 +2,7 @@
 # ----------
 # Adaptor of Tatami for Ruby on Rails
 # ----------
-#= require tatami
+#= require ./tatami
 
 turbolinksEnabled = @Turbolinks and @Turbolinks.supported is true
 
@@ -51,8 +51,23 @@ runHandlers = ( handlers, callback ) ->
 
 # 执行流程控制函数
 runFlowHandlers = ( type ) ->
-  @each ["unspecified", currentPageFlag(true)], ( page ) =>
-    runHandlers.call this, pageHandlers.storage[page][type]
+  pages = ["unspecified"]
+  flag = currentPageFlag true
+
+  if true #type is "prepare" or $("body script[src]:not([data-turbolinks-eval='false'][data-loaded='true'])").size() is 0
+    pages.push flag
+
+  @each pages, ( page ) =>
+    runHandlers.call this, pageHandlers.storage[page]?[type]
+
+  # if (scripts = $("body script[src]:not([data-turbolinks-eval='false'])")).size() > 0
+  #   lib = this
+  #   loaded = 0
+
+  #   $(scripts).on "load", ->
+  #     loaded++
+  #     $(this).attr "data-loaded", true
+  #     runHandlers.call lib, pageHandlers.storage[flag]?[type] if loaded is scripts.size()
 
 # 执行页面指定初始化函数
 runPageHandlers = ( page, func, isPlain ) ->
@@ -115,20 +130,22 @@ if turbolinksEnabled
 
   Tatami.init
     runSandbox: ->
-      $(document).on 
+      $(document).on
+        "page:before-change": ->
+          console.log "before-change"
         "page:change": =>
           console.log "change"
           page = currentPageFlag true
 
           # 执行 init 函数队列
           # 过程中会添加页面指定的 prepare、ready 函数
-          runHandlers.call this, pageHandlers.storage[page].init, ->
+          runHandlers.call this, pageHandlers.storage[page]?.init, ->
             currentPage = page
 
           runFlowHandlers.call this, "prepare"
+          runFlowHandlers.call this, "ready"
         "page:load": =>
           console.log "load"
-          runFlowHandlers.call this, "ready"
         # "page:restore": =>
         #   console.log "restore"
         #   runFlowHandlers.call this, "ready"
