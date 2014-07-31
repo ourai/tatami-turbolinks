@@ -1,11 +1,29 @@
 (function() {
-  var addHandlers, currentPage, currentPageFlag, handlerExists, handlerName, pageHandlers, runFlowHandlers, runHandlers, runPageHandlers, toNS, turbolinksEnabled;
+  var addHandlers, currentPage, currentPageFlag, handlerExists, handlerName, pageHandlers, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, _T, _ref, _ref1;
 
-  turbolinksEnabled = this.Turbolinks && this.Turbolinks.supported === true;
+  if (!Tatami.isPlainObject((_ref = Tatami.adaptor) != null ? _ref.rails : void 0)) {
+    return false;
+  }
 
-  pageHandlers = new Tatami.__class__.Storage("pageHandlers");
+  _T = Tatami;
+
+  pageHandlers = new _T.__class__.Storage("pageHandlers");
+
+  sequence = {};
 
   currentPage = void 0;
+
+  _T.mixin({
+    adaptor: {
+      rails: {
+        turbolinks: {
+          enabled: ((_ref1 = this.Turbolinks) != null ? _ref1.supported : void 0) === true,
+          handlers: pageHandlers.storage,
+          sequence: sequence
+        }
+      }
+    }
+  });
 
   toNS = function(str) {
     return str.replace("-", "_");
@@ -16,10 +34,16 @@
   };
 
   handlerExists = function(host, page, func, name) {
-    var existed, handler;
-    handler = pageHandlers.get("" + page + "." + host + "." + name);
-    existed = this.equal(func, handler);
-    return existed;
+    return this.equal(func, pageHandlers.get("" + page + "." + host + "." + name));
+  };
+
+  pushSeq = function(page, type, name) {
+    var seq;
+    seq = this.namespace(sequence, "" + page + "." + type);
+    if (seq == null) {
+      seq = sequence[page][type] = [];
+    }
+    return seq.push(name);
   };
 
   addHandlers = function(host, page, func, isPlain) {
@@ -39,28 +63,51 @@
         name = handlerName(func);
         if (!handlerExists.apply(_this, [host, flag, func, name])) {
           _this.namespace(handlers, "" + flag + "." + host + "." + name);
-          return handlers[flag][host][name] = func;
+          handlers[flag][host][name] = func;
+          return pushSeq.apply(_this, [flag, host, name]);
         }
       };
     })(this));
     return pageHandlers.set(handlers);
   };
 
-  runHandlers = function(handlers, callback) {
-    return this.each(handlers, function(handler) {
-      if (callback) {
-        callback();
-      }
-      return handler();
-    });
+  runHandlers = function(page, type, callback) {
+    var handlers, _ref2;
+    handlers = (_ref2 = pageHandlers.storage[page]) != null ? _ref2[type] : void 0;
+    if (handlers) {
+      return this.each(sequence[page][type], function(handlerName) {
+        if (callback) {
+          callback();
+        }
+        return handlers[handlerName]();
+      });
+    }
   };
 
   runFlowHandlers = function(type) {
-    return this.each(["unspecified", currentPageFlag(true)], (function(_this) {
+    var flag, lib, loaded, pages, scripts, selector;
+    pages = ["unspecified"];
+    flag = currentPageFlag(true);
+    selector = "body script[data-inside]";
+    if (type === "prepare" || $("" + selector + ":not([data-turbolinks-eval='false'][data-loaded='true'])").size() === 0) {
+      pages.push(flag);
+    }
+    this.each(pages, (function(_this) {
       return function(page) {
-        return runHandlers.call(_this, pageHandlers.storage[page][type]);
+        return runHandlers.apply(_this, [page, type]);
       };
     })(this));
+    if ((scripts = $("" + selector + ":not([data-turbolinks-eval='false'])")).size() > 0) {
+      lib = this;
+      loaded = 0;
+      return $(scripts).on("load", function() {
+        loaded++;
+        $(this).attr("data-loaded", true);
+        if (loaded === scripts.size()) {
+          return runHandlers.apply(lib, [flag, type]);
+        }
+      });
+    }
   };
 
   runPageHandlers = function(page, func, isPlain) {
@@ -86,11 +133,22 @@
     }
   };
 
-  Tatami.extend({
+  _T.extend({
     handlers: [
       {
+
+        /*
+         * 只有一个参数并且是字符串时判断当前页面是否为指定页面
+         * 否则添加指定页面的执行函数
+         * 
+         * @method   inPage
+         * @param    page {String/Array/Object}    指定页面的标记
+         * @param    [func] {Function}             回调函数
+         * @param    [stack] {Boolean}             将回调函数加入函数队列
+         * @return   {Boolean}
+         */
         name: "inPage",
-        handler: function(page, func) {
+        handler: function(page, func, stack) {
           var args, isObj, result;
           isObj = this.isPlainObject(page);
           if (arguments.length === 1 && !isObj) {
@@ -103,7 +161,7 @@
               page = [page];
             }
             args = [page, func, isObj];
-            if (turbolinksEnabled) {
+            if (stack === true || (document.body == null)) {
               args.unshift("init");
               addHandlers.apply(this, args);
             } else {
@@ -120,36 +178,39 @@
     ]
   });
 
-  if (turbolinksEnabled) {
-    Tatami.mixin({
+  if (_T.hasProp("supported", this.Turbolinks)) {
+    _T.mixin({
       prepare: function(handler) {
         addHandlers.call(this, "prepare", [currentPage], handler);
       },
-      ready: function(handler) {
-        addHandlers.call(this, "ready", [currentPage], handler);
+      ready: function(handler, page) {
+        addHandlers.call(this, "ready", [page != null ? toNS(page) : currentPage], handler);
       }
     });
-    Tatami.init({
+    runAllHandlers = function(context) {
+      var page;
+      page = currentPageFlag(true);
+      runHandlers.call(context, page, "init", function() {
+        return currentPage = page;
+      });
+      runFlowHandlers.call(context, "prepare");
+      return runFlowHandlers.call(context, "ready");
+    };
+    _T.init({
       runSandbox: function() {
-        return $(document).on({
-          "page:change": (function(_this) {
-            return function() {
-              var page;
-              console.log("change");
-              page = currentPageFlag(true);
-              runHandlers.call(_this, pageHandlers.storage[page].init, function() {
-                return currentPage = page;
-              });
-              return runFlowHandlers.call(_this, "prepare");
-            };
-          })(this),
-          "page:load": (function(_this) {
-            return function() {
-              console.log("load");
-              return runFlowHandlers.call(_this, "ready");
-            };
-          })(this)
-        });
+        var context;
+        context = this;
+        if (this.adaptor.rails.turbolinks.enabled) {
+          return $(document).on({
+            "page:change": function() {
+              return runAllHandlers(context);
+            }
+          });
+        } else {
+          return $(document).ready(function() {
+            return runAllHandlers(context);
+          });
+        }
       }
     });
   }

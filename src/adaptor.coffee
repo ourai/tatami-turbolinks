@@ -4,14 +4,24 @@
 # ----------
 #= require ./tatami
 
-turbolinksIncluded = @Turbolinks and Tatami.hasProp "supported", @Turbolinks
-turbolinksEnabled = turbolinksIncluded and @Turbolinks.supported is true
+if not Tatami.isPlainObject Tatami.adaptor?.rails
+  return false
+
+_T = Tatami
 
 # storage for page handlers
-pageHandlers = new Tatami.__class__.Storage "pageHandlers"
+pageHandlers = new _T.__class__.Storage "pageHandlers"
 sequence = {}
 
 currentPage = undefined
+
+_T.mixin
+  adaptor:
+    rails:
+      turbolinks:
+        enabled: @Turbolinks?.supported is true
+        handlers: pageHandlers.storage
+        sequence: sequence
 
 toNS = ( str ) ->
   return str.replace "-", "_"
@@ -20,13 +30,7 @@ handlerName = ( func ) ->
   return func.toString().length.toString(16) + ""
 
 handlerExists = ( host, page, func, name ) ->
-  handler = pageHandlers.get "#{page}.#{host}.#{name}"
-  existed = @equal func, handler
-
-  # if name is handlerName handler
-  #   console.log "#{name} exists", existed
-
-  return existed
+  return @equal func, pageHandlers.get "#{page}.#{host}.#{name}"
 
 # 将函数名称添加到执行队列中
 pushSeq = ( page, type, name ) ->
@@ -102,12 +106,22 @@ currentPageFlag = ( convert ) ->
 
   return if convert is true then toNS(page) else page
 
-Tatami.extend
+_T.extend
   handlers: [
     {
+      ###
+      # 只有一个参数并且是字符串时判断当前页面是否为指定页面
+      # 否则添加指定页面的执行函数
+      # 
+      # @method   inPage
+      # @param    page {String/Array/Object}    指定页面的标记
+      # @param    [func] {Function}             回调函数
+      # @param    [stack] {Boolean}             将回调函数加入函数队列
+      # @return   {Boolean}
+      ###
       name: "inPage"
 
-      handler: ( page, func ) ->
+      handler: ( page, func, stack ) ->
         isObj = @isPlainObject page
 
         # 判断当前页面是否为指定页面
@@ -119,7 +133,7 @@ Tatami.extend
           args = [page, func, isObj]
 
           # 设置特定页面执行的函数
-          if turbolinksIncluded
+          if stack is true or not document.body?
             args.unshift "init"
             addHandlers.apply this, args
           # 立即执行函数
@@ -136,8 +150,8 @@ Tatami.extend
   ]
 
 # Support for turbolinks (https://github.com/rails/turbolinks)
-if turbolinksIncluded
-  Tatami.mixin
+if _T.hasProp "supported", @Turbolinks
+  _T.mixin
     prepare: ( handler ) ->
       addHandlers.call this, "prepare", [currentPage], handler
       return 
@@ -157,19 +171,14 @@ if turbolinksIncluded
     runFlowHandlers.call context, "prepare"
     runFlowHandlers.call context, "ready"
 
-  Tatami.init
+  _T.init
     runSandbox: ->
       context = this
 
-      if turbolinksEnabled
+      if @adaptor.rails.turbolinks.enabled
         $(document).on
           "page:change": ->
             runAllHandlers context
-          # "page:load": =>
-          #   console.log "load"
       else
         $(document).ready ->
           runAllHandlers context
-
-Tatami.adaptor =
-  turbolinks: { enabled: turbolinksEnabled, pageHandlers, sequence }
