@@ -4,7 +4,7 @@
 # ----------
 #= require ./tatami
 
-if not Tatami.isPlainObject Tatami.adaptor?.rails
+if Tatami.isPlainObject Tatami.adaptor?.rails
   return false
 
 _T = Tatami
@@ -12,16 +12,37 @@ _T = Tatami
 # storage for page handlers
 pageHandlers = new _T.__class__.Storage "pageHandlers"
 sequence = {}
+execution = {}
 
 currentPage = undefined
+turbolinksEnabled = @Turbolinks?.supported is true
 
 _T.mixin
   adaptor:
     rails:
-      turbolinks:
-        enabled: @Turbolinks?.supported is true
-        handlers: pageHandlers.storage
-        sequence: sequence
+      turbolinks: {enabled: turbolinksEnabled, handlers: pageHandlers.storage, sequence, execution}
+
+if turbolinksEnabled
+  # 监控动态插入的 <script>
+  do ->
+    method = Node::insertBefore
+
+    loaded = 0
+    scripts = 0
+
+    onload = ->
+      loaded++
+      @setAttribute "data-loaded", true
+      console.log this.src
+      runHandlers.apply(_T, [currentPageFlag(true), "ready"]) if loaded is scripts
+
+    Node::insertBefore = ( node ) ->
+      if node.tagName.toLowerCase() is "script" and _T.data(node)["inside"]
+        scripts++
+        node.async = false
+        node.onload = onload
+
+      method.apply this, arguments
 
 toNS = ( str ) ->
   return str.replace "-", "_"
@@ -37,6 +58,10 @@ pushSeq = ( page, type, name ) ->
   seq = @namespace sequence, "#{page}.#{type}"
   seq = sequence[page][type] = [] if not seq?
   seq.push name
+
+handlerStatus = ( page, type, name ) ->
+  exec = @namespace execution, "#{page}.#{type}.#{name}"
+  execution[page][type][name] = false if exec is null
 
 addHandlers = ( host, page, func, isPlain ) ->
   handlers = {}
@@ -54,6 +79,7 @@ addHandlers = ( host, page, func, isPlain ) ->
       @namespace handlers, "#{flag}.#{host}.#{name}"
       handlers[flag][host][name] = func
       pushSeq.apply this, [flag, host, name]
+      handlerStatus.apply this, [flag, host, name]
 
   pageHandlers.set handlers
 
@@ -62,30 +88,26 @@ runHandlers = ( page, type, callback ) ->
   handlers = pageHandlers.storage[page]?[type]
 
   if handlers
+    statuses = execution[page][type]
+
     @each sequence[page][type], ( handlerName ) ->
       callback() if callback
-      handlers[handlerName]()
+      
+      if page is "unspecified" or statuses[handlerName] is false
+        statuses[handlerName] = true
+        handlers[handlerName]()
 
 # 执行流程控制函数
 runFlowHandlers = ( type ) ->
   pages = ["unspecified"]
   flag = currentPageFlag true
-  selector = "body script[data-inside]"
+  scripts = $("body script[data-inside]:not([data-turbolinks-eval='false'][data-loaded='true'])")
 
-  if type is "prepare" or $("#{selector}:not([data-turbolinks-eval='false'][data-loaded='true'])").size() is 0
+  if type is "prepare" or not turbolinksEnabled or scripts.size() is 0
     pages.push flag
 
   @each pages, ( page ) =>
     runHandlers.apply this, [page, type]
-
-  if (scripts = $("#{selector}:not([data-turbolinks-eval='false'])")).size() > 0
-    lib = this
-    loaded = 0
-
-    $(scripts).on "load", ->
-      loaded++
-      $(this).attr "data-loaded", true
-      runHandlers.apply lib, [flag, type] if loaded is scripts.size()
 
 # 执行页面指定初始化函数
 runPageHandlers = ( page, func, isPlain ) ->
@@ -151,6 +173,8 @@ _T.extend
 
 # Support for turbolinks (https://github.com/rails/turbolinks)
 if _T.hasProp "supported", @Turbolinks
+  changeable = true
+
   _T.mixin
     prepare: ( handler ) ->
       addHandlers.call this, "prepare", [currentPage], handler
@@ -160,7 +184,7 @@ if _T.hasProp "supported", @Turbolinks
       return
 
   runAllHandlers = ( context ) ->
-    # console.log "Run! Run!! Run!!!"
+    console.log "Run! Run!! Run!!!"
     page = currentPageFlag true
 
     # 执行 init 函数队列
@@ -171,14 +195,59 @@ if _T.hasProp "supported", @Turbolinks
     runFlowHandlers.call context, "prepare"
     runFlowHandlers.call context, "ready"
 
+  $doc = $(document)
+
+  adaptor =
+    isReady: false
+
+    use: ( load, fetch, expire ) ->
+      $doc
+        .off ".adaptor"
+        .on "#{load}.adaptor", @onLoad
+        .on "#{fetch}.adaptor", @onFetch
+        .on "#{expire}.adaptor", @onExpire
+
+    addCallback: ( callback ) ->
+      if adaptor.isReady
+        callback $
+      else
+        $doc.on "adaptor:ready", ->
+          callback $
+
+    onLoad: ->
+      adaptor.isReady = true
+      $doc.trigger "adaptor:ready"
+
+    onFetch: ->
+      adaptor.isReady = false
+
+    onExpire: ( page ) ->
+      delete execution[toNS $(page.body).data("page")]
+
+    register: ->
+      $(@onLoad)
+      $.fn.ready = @addCallback
+
   _T.init
     runSandbox: ->
-      context = this
+      # context = this
 
-      if @adaptor.rails.turbolinks.enabled
-        $(document).on
-          "page:change": ->
-            runAllHandlers context
-      else
-        $(document).ready ->
-          runAllHandlers context
+      adaptor.register()
+      adaptor.use "page:load", "page:fetch"
+
+      $doc.ready =>
+        runAllHandlers this
+
+      # if turbolinksEnabled
+      #   $doc.on
+      #     "page:receive": ->
+      #       changeable = true
+      #     "page:load": ->
+      #       # console.log "load a", changeable
+
+      #       # if changeable
+      #       runAllHandlers context
+      #       changeable = false
+      # else
+      #   $doc.ready ->
+      #     runAllHandlers context
