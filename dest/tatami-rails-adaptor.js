@@ -1,7 +1,7 @@
 (function() {
-  var addHandlers, currentPage, currentPageFlag, handlerExists, handlerName, pageHandlers, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, _T, _ref, _ref1;
+  var $doc, adaptor, addHandlers, changeable, currentPage, currentPageFlag, execution, handlerExists, handlerName, handlerStatus, pageHandlers, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
 
-  if (!Tatami.isPlainObject((_ref = Tatami.adaptor) != null ? _ref.rails : void 0)) {
+  if (Tatami.isPlainObject((_ref = Tatami.adaptor) != null ? _ref.rails : void 0)) {
     return false;
   }
 
@@ -11,19 +11,49 @@
 
   sequence = {};
 
+  execution = {};
+
   currentPage = void 0;
+
+  turbolinksEnabled = ((_ref1 = this.Turbolinks) != null ? _ref1.supported : void 0) === true;
 
   _T.mixin({
     adaptor: {
       rails: {
         turbolinks: {
-          enabled: ((_ref1 = this.Turbolinks) != null ? _ref1.supported : void 0) === true,
+          enabled: turbolinksEnabled,
           handlers: pageHandlers.storage,
-          sequence: sequence
+          sequence: sequence,
+          execution: execution
         }
       }
     }
   });
+
+  if (turbolinksEnabled) {
+    (function() {
+      var loaded, method, onload, scripts;
+      method = Node.prototype.insertBefore;
+      loaded = 0;
+      scripts = 0;
+      onload = function() {
+        loaded++;
+        this.setAttribute("data-loaded", true);
+        console.log(this.src);
+        if (loaded === scripts) {
+          return runHandlers.apply(_T, [currentPageFlag(true), "ready"]);
+        }
+      };
+      return Node.prototype.insertBefore = function(node) {
+        if (node.tagName.toLowerCase() === "script" && _T.data(node)["inside"]) {
+          scripts++;
+          node.async = false;
+          node.onload = onload;
+        }
+        return method.apply(this, arguments);
+      };
+    })();
+  }
 
   toNS = function(str) {
     return str.replace("-", "_");
@@ -46,6 +76,14 @@
     return seq.push(name);
   };
 
+  handlerStatus = function(page, type, name) {
+    var exec;
+    exec = this.namespace(execution, "" + page + "." + type + "." + name);
+    if (exec === null) {
+      return execution[page][type][name] = false;
+    }
+  };
+
   addHandlers = function(host, page, func, isPlain) {
     var handlers;
     handlers = {};
@@ -64,7 +102,8 @@
         if (!handlerExists.apply(_this, [host, flag, func, name])) {
           _this.namespace(handlers, "" + flag + "." + host + "." + name);
           handlers[flag][host][name] = func;
-          return pushSeq.apply(_this, [flag, host, name]);
+          pushSeq.apply(_this, [flag, host, name]);
+          return handlerStatus.apply(_this, [flag, host, name]);
         }
       };
     })(this));
@@ -72,42 +111,35 @@
   };
 
   runHandlers = function(page, type, callback) {
-    var handlers, _ref2;
+    var handlers, statuses, _ref2;
     handlers = (_ref2 = pageHandlers.storage[page]) != null ? _ref2[type] : void 0;
     if (handlers) {
+      statuses = execution[page][type];
       return this.each(sequence[page][type], function(handlerName) {
         if (callback) {
           callback();
         }
-        return handlers[handlerName]();
+        if (page === "unspecified" || statuses[handlerName] === false) {
+          statuses[handlerName] = true;
+          return handlers[handlerName]();
+        }
       });
     }
   };
 
   runFlowHandlers = function(type) {
-    var flag, lib, loaded, pages, scripts, selector;
+    var flag, pages, scripts;
     pages = ["unspecified"];
     flag = currentPageFlag(true);
-    selector = "body script[data-inside]";
-    if (type === "prepare" || $("" + selector + ":not([data-turbolinks-eval='false'][data-loaded='true'])").size() === 0) {
+    scripts = $("body script[data-inside]:not([data-turbolinks-eval='false'][data-loaded='true'])");
+    if (type === "prepare" || !turbolinksEnabled || scripts.size() === 0) {
       pages.push(flag);
     }
-    this.each(pages, (function(_this) {
+    return this.each(pages, (function(_this) {
       return function(page) {
         return runHandlers.apply(_this, [page, type]);
       };
     })(this));
-    if ((scripts = $("" + selector + ":not([data-turbolinks-eval='false'])")).size() > 0) {
-      lib = this;
-      loaded = 0;
-      return $(scripts).on("load", function() {
-        loaded++;
-        $(this).attr("data-loaded", true);
-        if (loaded === scripts.size()) {
-          return runHandlers.apply(lib, [flag, type]);
-        }
-      });
-    }
   };
 
   runPageHandlers = function(page, func, isPlain) {
@@ -179,6 +211,7 @@
   });
 
   if (_T.hasProp("supported", this.Turbolinks)) {
+    changeable = true;
     _T.mixin({
       prepare: function(handler) {
         addHandlers.call(this, "prepare", [currentPage], handler);
@@ -187,30 +220,55 @@
         addHandlers.call(this, "ready", [page != null ? toNS(page) : currentPage], handler);
       }
     });
-    runAllHandlers = function(context) {
+    runAllHandlers = function() {
       var page;
+      console.log("Run! Run!! Run!!!");
       page = currentPageFlag(true);
-      runHandlers.call(context, page, "init", function() {
+      runHandlers.call(this, page, "init", function() {
         return currentPage = page;
       });
-      runFlowHandlers.call(context, "prepare");
-      return runFlowHandlers.call(context, "ready");
+      runFlowHandlers.call(this, "prepare");
+      return runFlowHandlers.call(this, "ready");
+    };
+    $doc = $(document);
+    adaptor = {
+      isReady: false,
+      use: function(load, fetch, expire) {
+        return $doc.off(".adaptor").on("" + load + ".adaptor", this.onLoad).on("" + fetch + ".adaptor", this.onFetch).on("" + expire + ".adaptor", this.onExpire);
+      },
+      addCallback: function(callback) {
+        if (adaptor.isReady) {
+          return callback($);
+        } else {
+          return $doc.on("adaptor:ready", function() {
+            return callback($);
+          });
+        }
+      },
+      onLoad: function() {
+        adaptor.isReady = true;
+        return $doc.trigger("adaptor:ready");
+      },
+      onFetch: function() {
+        return adaptor.isReady = false;
+      },
+      onExpire: function(page) {
+        return delete execution[toNS($(page.body).data("page"))];
+      },
+      register: function() {
+        $(this.onLoad);
+        return $.fn.ready = this.addCallback;
+      }
     };
     _T.init({
       runSandbox: function() {
-        var context;
-        context = this;
-        if (this.adaptor.rails.turbolinks.enabled) {
-          return $(document).on({
-            "page:change": function() {
-              return runAllHandlers(context);
-            }
-          });
-        } else {
-          return $(document).ready(function() {
-            return runAllHandlers(context);
-          });
-        }
+        adaptor.register();
+        adaptor.use("page:load", "page:fetch", "page:expire");
+        return $doc.ready((function(_this) {
+          return function() {
+            return runAllHandlers.call(_this);
+          };
+        })(this));
       }
     });
   }

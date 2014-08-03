@@ -183,20 +183,20 @@ if _T.hasProp "supported", @Turbolinks
       addHandlers.call this, "ready", [if page? then toNS(page) else currentPage], handler
       return
 
-  runAllHandlers = ( context ) ->
+  runAllHandlers = ->
     console.log "Run! Run!! Run!!!"
     page = currentPageFlag true
 
     # 执行 init 函数队列
     # 过程中会添加页面指定的 prepare、ready 函数
-    runHandlers.call context, page, "init", ->
+    runHandlers.call this, page, "init", ->
       currentPage = page
 
-    runFlowHandlers.call context, "prepare"
-    runFlowHandlers.call context, "ready"
+    runFlowHandlers.call this, "prepare"
+    runFlowHandlers.call this, "ready"
 
+  # Same to jQuery Turbolinks (https://github.com/kossnocorp/jquery.turbolinks)
   $doc = $(document)
-
   adaptor =
     isReady: false
 
@@ -230,24 +230,8 @@ if _T.hasProp "supported", @Turbolinks
 
   _T.init
     runSandbox: ->
-      # context = this
-
       adaptor.register()
-      adaptor.use "page:load", "page:fetch"
+      adaptor.use "page:load", "page:fetch", "page:expire"
 
       $doc.ready =>
-        runAllHandlers this
-
-      # if turbolinksEnabled
-      #   $doc.on
-      #     "page:receive": ->
-      #       changeable = true
-      #     "page:load": ->
-      #       # console.log "load a", changeable
-
-      #       # if changeable
-      #       runAllHandlers context
-      #       changeable = false
-      # else
-      #   $doc.ready ->
-      #     runAllHandlers context
+        runAllHandlers.call this
