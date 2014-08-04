@@ -81,6 +81,8 @@ addHandlers = ( host, page, func, isPlain ) ->
       pushSeq.apply this, [flag, host, name]
       handlerStatus.apply this, [flag, host, name]
 
+    return true
+
   pageHandlers.set handlers
 
 # 执行 pageHandlers 的函数
@@ -222,6 +224,7 @@ if _T.hasProp "supported", @Turbolinks
       adaptor.isReady = false
 
     onExpire: ( page ) ->
+      console.log "page #{page.url} is expired"
       delete execution[toNS $(page.body).data("page")]
 
     register: ->
