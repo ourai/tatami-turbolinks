@@ -43,7 +43,7 @@ if turbolinksEnabled
         node.async = false
         node.onload = onload
 
-      method.apply this, arguments
+      return method.apply this, arguments
 
 toNS = ( str ) ->
   return str.replace "-", "_"
@@ -60,9 +60,9 @@ pushSeq = ( page, type, name ) ->
   seq = sequence[page][type] = [] if not seq?
   seq.push name
 
-handlerStatus = ( page, type, name ) ->
-  exec = @namespace execution, "#{page}.#{type}.#{name}"
-  execution[page][type][name] = false if exec is null
+# handlerStatus = ( page, type, name ) ->
+#   exec = @namespace execution, "#{page}.#{type}.#{name}"
+#   execution[page][type][name] = false if exec is null
 
 addHandlers = ( host, page, func, isPlain ) ->
   handlers = {}
@@ -80,7 +80,7 @@ addHandlers = ( host, page, func, isPlain ) ->
       @namespace handlers, "#{flag}.#{host}.#{name}"
       handlers[flag][host][name] = func
       pushSeq.apply this, [flag, host, name]
-      handlerStatus.apply this, [flag, host, name]
+      # handlerStatus.apply this, [flag, host, name]
 
     return true
 
@@ -91,14 +91,15 @@ runHandlers = ( page, type, callback ) ->
   handlers = pageHandlers.storage[page]?[type]
 
   if handlers
-    statuses = execution[page][type]
+    # statuses = execution[page][type]
 
     @each sequence[page][type], ( handlerName ) ->
       callback() if callback
+      handlers[handlerName]()
       
-      if page is "unspecified" or statuses[handlerName] is false
-        statuses[handlerName] = true
-        handlers[handlerName]()
+      # if page is "unspecified" or statuses[handlerName] is false
+      #   statuses[handlerName] = true
+      #   handlers[handlerName]()
 
 # 执行流程控制函数
 runFlowHandlers = ( type ) ->

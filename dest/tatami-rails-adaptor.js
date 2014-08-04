@@ -1,5 +1,5 @@
 (function() {
-  var $doc, adaptor, addHandlers, changeable, currentPage, currentPageFlag, execution, handlerExists, handlerName, handlerStatus, pageHandlers, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
+  var addHandlers, currentPage, currentPageFlag, execution, handlerExists, handlerName, pageHandlers, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
 
   if (Tatami.isPlainObject((_ref = Tatami.adaptor) != null ? _ref.rails : void 0)) {
     return false;
@@ -76,14 +76,6 @@
     return seq.push(name);
   };
 
-  handlerStatus = function(page, type, name) {
-    var exec;
-    exec = this.namespace(execution, "" + page + "." + type + "." + name);
-    if (exec === null) {
-      return execution[page][type][name] = false;
-    }
-  };
-
   addHandlers = function(host, page, func, isPlain) {
     var handlers;
     handlers = {};
@@ -103,26 +95,22 @@
           _this.namespace(handlers, "" + flag + "." + host + "." + name);
           handlers[flag][host][name] = func;
           pushSeq.apply(_this, [flag, host, name]);
-          return handlerStatus.apply(_this, [flag, host, name]);
         }
+        return true;
       };
     })(this));
     return pageHandlers.set(handlers);
   };
 
   runHandlers = function(page, type, callback) {
-    var handlers, statuses, _ref2;
+    var handlers, _ref2;
     handlers = (_ref2 = pageHandlers.storage[page]) != null ? _ref2[type] : void 0;
     if (handlers) {
-      statuses = execution[page][type];
       return this.each(sequence[page][type], function(handlerName) {
         if (callback) {
           callback();
         }
-        if (page === "unspecified" || statuses[handlerName] === false) {
-          statuses[handlerName] = true;
-          return handlers[handlerName]();
-        }
+        return handlers[handlerName]();
       });
     }
   };
@@ -211,7 +199,6 @@
   });
 
   if (_T.hasProp("supported", this.Turbolinks)) {
-    changeable = true;
     _T.mixin({
       prepare: function(handler) {
         addHandlers.call(this, "prepare", [currentPage], handler);
@@ -230,41 +217,9 @@
       runFlowHandlers.call(this, "prepare");
       return runFlowHandlers.call(this, "ready");
     };
-    $doc = $(document);
-    adaptor = {
-      isReady: false,
-      use: function(load, fetch, expire) {
-        return $doc.off(".adaptor").on("" + load + ".adaptor", this.onLoad).on("" + fetch + ".adaptor", this.onFetch).on("" + expire + ".adaptor", this.onExpire);
-      },
-      addCallback: function(callback) {
-        if (adaptor.isReady) {
-          return callback($);
-        } else {
-          return $doc.on("adaptor:ready", function() {
-            return callback($);
-          });
-        }
-      },
-      onLoad: function() {
-        adaptor.isReady = true;
-        return $doc.trigger("adaptor:ready");
-      },
-      onFetch: function() {
-        return adaptor.isReady = false;
-      },
-      onExpire: function(page) {
-        return delete execution[toNS($(page.body).data("page"))];
-      },
-      register: function() {
-        $(this.onLoad);
-        return $.fn.ready = this.addCallback;
-      }
-    };
     _T.init({
       runSandbox: function() {
-        adaptor.register();
-        adaptor.use("page:load", "page:fetch", "page:expire");
-        return $doc.ready((function(_this) {
+        return $(document).ready((function(_this) {
           return function() {
             return runAllHandlers.call(_this);
           };
