@@ -2,6 +2,7 @@
 # ----------
 # Adaptor of Tatami for Ruby on Rails
 # ----------
+#= require jquery.turbolinks
 #= require ./tatami
 
 if Tatami.isPlainObject Tatami.adaptor?.rails
@@ -175,8 +176,6 @@ _T.extend
 
 # Support for turbolinks (https://github.com/rails/turbolinks)
 if _T.hasProp "supported", @Turbolinks
-  changeable = true
-
   _T.mixin
     prepare: ( handler ) ->
       addHandlers.call this, "prepare", [currentPage], handler
@@ -197,44 +196,7 @@ if _T.hasProp "supported", @Turbolinks
     runFlowHandlers.call this, "prepare"
     runFlowHandlers.call this, "ready"
 
-  # Same to jQuery Turbolinks (https://github.com/kossnocorp/jquery.turbolinks)
-  $doc = $(document)
-  adaptor =
-    isReady: false
-
-    use: ( load, fetch, expire ) ->
-      $doc
-        .off ".adaptor"
-        .on "#{load}.adaptor", @onLoad
-        .on "#{fetch}.adaptor", @onFetch
-        .on "#{expire}.adaptor", @onExpire
-
-    addCallback: ( callback ) ->
-      if adaptor.isReady
-        callback $
-      else
-        $doc.on "adaptor:ready", ->
-          callback $
-
-    onLoad: ->
-      adaptor.isReady = true
-      $doc.trigger "adaptor:ready"
-
-    onFetch: ->
-      adaptor.isReady = false
-
-    onExpire: ( page ) ->
-      console.log "page #{page.url} is expired"
-      delete execution[toNS $(page.body).data("page")]
-
-    register: ->
-      $(@onLoad)
-      $.fn.ready = @addCallback
-
   _T.init
     runSandbox: ->
-      adaptor.register()
-      adaptor.use "page:load", "page:fetch", "page:expire"
-
-      $doc.ready =>
+      $(document).ready =>
         runAllHandlers.call this
