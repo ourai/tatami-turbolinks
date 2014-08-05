@@ -18,6 +18,8 @@ execution = {}
 currentPage = undefined
 turbolinksEnabled = @Turbolinks?.supported is true
 
+pageViaAJAX = false
+
 _T.mixin
   adaptor:
     rails:
@@ -34,7 +36,6 @@ if turbolinksEnabled
     onload = ->
       loaded++
       @setAttribute "data-loaded", true
-      console.log this.src
       runHandlers.apply(_T, [currentPageFlag(true), "ready"]) if loaded is scripts
 
     Node::insertBefore = ( node ) ->
@@ -107,7 +108,7 @@ runFlowHandlers = ( type ) ->
   flag = currentPageFlag true
   scripts = $("body script[data-inside]:not([data-turbolinks-eval='false'][data-loaded='true'])")
 
-  if type is "prepare" or not turbolinksEnabled or scripts.size() is 0
+  if type is "prepare" or not turbolinksEnabled or not pageViaAJAX or scripts.size() is 0
     pages.push flag
 
   @each pages, ( page ) =>
@@ -199,5 +200,11 @@ if _T.hasProp "supported", @Turbolinks
 
   _T.init
     runSandbox: ->
+      $(document).on
+        "page:fetch": ->
+          pageViaAJAX = true
+        "page:load": ->
+          pageViaAJAX = false
+
       $(document).ready =>
         runAllHandlers.call this
