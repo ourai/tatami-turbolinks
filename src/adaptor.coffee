@@ -65,13 +65,25 @@ pushSeq = ( page, type, name ) ->
 #   exec = @namespace execution, "#{page}.#{type}.#{name}"
 #   execution[page][type][name] = false if exec is null
 
-addHandlers = ( host, page, func, isPlain ) ->
+deleteHandler = ( host, handlerName ) ->
+  try
+    delete host[handlerName]
+  catch error
+    host[handlerName] = undefined
+
+  return
+
+addHandlers = ( host, page, func, once ) ->
+  isPlain = @isPlainObject page
   handlers = {}
 
   @each page, ( flag, idx ) =>
     if isPlain
       func = flag
       flag = idx
+
+    # 只运行一次
+    func.execOnce = true if once
 
     flag = "unspecified" if not flag?
     flag = toNS flag
@@ -95,8 +107,12 @@ runHandlers = ( page, type, callback ) ->
     # statuses = execution[page][type]
 
     @each sequence[page][type], ( handlerName ) ->
+      handler = handlers[handlerName]
+
       callback() if callback
-      handlers[handlerName]()
+
+      handler()
+      deleteHandler(handlers, handlerName) if handler.execOnce
       
       # if page is "unspecified" or statuses[handlerName] is false
       #   statuses[handlerName] = true
@@ -157,7 +173,7 @@ _T.extend
           result = @inArray(currentPageFlag(), page) > -1
         else
           page = [page] if @isString page
-          args = [page, func, isObj]
+          args = [page, func]
 
           # 设置特定页面执行的函数
           if stack is true or not document.body?
@@ -165,6 +181,7 @@ _T.extend
             addHandlers.apply this, args
           # 立即执行函数
           else
+            args.push isObj
             runPageHandlers.apply this, args
 
         return result or false
@@ -180,14 +197,14 @@ _T.extend
 if _T.hasProp "supported", @Turbolinks
   _T.mixin
     prepare: ( handler ) ->
-      addHandlers.call this, "prepare", [currentPage], handler
+      addHandlers.apply this, ["prepare", [currentPage], handler]
       return 
-    ready: ( handler, page ) ->
-      addHandlers.call this, "ready", [if page? then toNS(page) else currentPage], handler
+    ready: ( handler, page, once ) ->
+      addHandlers.apply this, ["ready", [if page? then toNS(page) else currentPage], handler, once]
       return
 
   runAllHandlers = ->
-    console.log "Run! Run!! Run!!!"
+    # console.log "Run! Run!! Run!!!"
     page = currentPageFlag true
 
     # 执行 init 函数队列

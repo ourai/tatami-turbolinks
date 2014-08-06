@@ -1,5 +1,5 @@
 (function() {
-  var addHandlers, currentPage, currentPageFlag, execution, handlerExists, handlerName, pageHandlers, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
+  var addHandlers, currentPage, currentPageFlag, deleteHandler, execution, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
 
   if (Tatami.isPlainObject((_ref = Tatami.adaptor) != null ? _ref.rails : void 0)) {
     return false;
@@ -16,6 +16,8 @@
   currentPage = void 0;
 
   turbolinksEnabled = ((_ref1 = this.Turbolinks) != null ? _ref1.supported : void 0) === true;
+
+  pageViaAJAX = false;
 
   _T.mixin({
     adaptor: {
@@ -39,7 +41,6 @@
       onload = function() {
         loaded++;
         this.setAttribute("data-loaded", true);
-        console.log(this.src);
         if (loaded === scripts) {
           return runHandlers.apply(_T, [currentPageFlag(true), "ready"]);
         }
@@ -76,8 +77,19 @@
     return seq.push(name);
   };
 
-  addHandlers = function(host, page, func, isPlain) {
-    var handlers;
+  deleteHandler = function(host, handlerName) {
+    var error;
+    try {
+      delete host[handlerName];
+    } catch (_error) {
+      error = _error;
+      host[handlerName] = void 0;
+    }
+  };
+
+  addHandlers = function(host, page, func, once) {
+    var handlers, isPlain;
+    isPlain = this.isPlainObject(page);
     handlers = {};
     this.each(page, (function(_this) {
       return function(flag, idx) {
@@ -85,6 +97,9 @@
         if (isPlain) {
           func = flag;
           flag = idx;
+        }
+        if (once) {
+          func.execOnce = true;
         }
         if (flag == null) {
           flag = "unspecified";
@@ -107,10 +122,15 @@
     handlers = (_ref2 = pageHandlers.storage[page]) != null ? _ref2[type] : void 0;
     if (handlers) {
       return this.each(sequence[page][type], function(handlerName) {
+        var handler;
+        handler = handlers[handlerName];
         if (callback) {
           callback();
         }
-        return handlers[handlerName]();
+        handler();
+        if (handler.execOnce) {
+          return deleteHandler(handlers, handlerName);
+        }
       });
     }
   };
@@ -120,7 +140,7 @@
     pages = ["unspecified"];
     flag = currentPageFlag(true);
     scripts = $("body script[data-inside]:not([data-turbolinks-eval='false'][data-loaded='true'])");
-    if (type === "prepare" || !turbolinksEnabled || scripts.size() === 0) {
+    if (type === "prepare" || !turbolinksEnabled || !pageViaAJAX || scripts.size() === 0) {
       pages.push(flag);
     }
     return this.each(pages, (function(_this) {
@@ -180,11 +200,12 @@
             if (this.isString(page)) {
               page = [page];
             }
-            args = [page, func, isObj];
+            args = [page, func];
             if (stack === true || (document.body == null)) {
               args.unshift("init");
               addHandlers.apply(this, args);
             } else {
+              args.push(isObj);
               runPageHandlers.apply(this, args);
             }
           }
@@ -201,15 +222,14 @@
   if (_T.hasProp("supported", this.Turbolinks)) {
     _T.mixin({
       prepare: function(handler) {
-        addHandlers.call(this, "prepare", [currentPage], handler);
+        addHandlers.apply(this, ["prepare", [currentPage], handler]);
       },
-      ready: function(handler, page) {
-        addHandlers.call(this, "ready", [page != null ? toNS(page) : currentPage], handler);
+      ready: function(handler, page, once) {
+        addHandlers.apply(this, ["ready", [page != null ? toNS(page) : currentPage], handler, once]);
       }
     });
     runAllHandlers = function() {
       var page;
-      console.log("Run! Run!! Run!!!");
       page = currentPageFlag(true);
       runHandlers.call(this, page, "init", function() {
         return currentPage = page;
@@ -219,6 +239,14 @@
     };
     _T.init({
       runSandbox: function() {
+        $(document).on({
+          "page:fetch": function() {
+            return pageViaAJAX = true;
+          },
+          "page:load": function() {
+            return pageViaAJAX = false;
+          }
+        });
         return $(document).ready((function(_this) {
           return function() {
             return runAllHandlers.call(_this);
