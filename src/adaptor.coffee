@@ -65,11 +65,16 @@ pushSeq = ( page, type, name ) ->
 #   exec = @namespace execution, "#{page}.#{type}.#{name}"
 #   execution[page][type][name] = false if exec is null
 
-deleteHandler = ( host, handlerName ) ->
+deleteHandler = ( page, type, name ) ->
+  host = pageHandlers.storage[page][type]
+
   try
-    delete host[handlerName]
+    delete host[name]
   catch error
-    host[handlerName] = undefined
+    host[name] = undefined
+
+  sequence[page][type] = @filter sequence[page][type], ( handlerName ) ->
+    return handlerName isnt name
 
   return
 
@@ -106,13 +111,13 @@ runHandlers = ( page, type, callback ) ->
   if handlers
     # statuses = execution[page][type]
 
-    @each sequence[page][type], ( handlerName ) ->
+    @each sequence[page][type], ( handlerName ) =>
       handler = handlers[handlerName]
 
       callback() if callback
 
       handler()
-      deleteHandler(handlers, handlerName) if handler.execOnce
+      deleteHandler.apply(this, [page, type, handlerName]) if handler.execOnce
       
       # if page is "unspecified" or statuses[handlerName] is false
       #   statuses[handlerName] = true
