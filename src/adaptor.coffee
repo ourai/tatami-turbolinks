@@ -231,8 +231,8 @@ if _T.hasProp "supported", @Turbolinks
     runSandbox: ->
       $(document).on
         "page:fetch": ->
-          pageViaAJAX = true
           _T.destroySystemDialogs()
+          pageViaAJAX = true
         "page:load": ->
           pageViaAJAX = false
 

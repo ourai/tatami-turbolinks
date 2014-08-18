@@ -61,11 +61,18 @@
   };
 
   handlerName = function(func) {
-    return func.toString().length.toString(16) + "";
+    return (func.id != null ? "" + func.id + "_" : "") + func.toString().length.toString(16);
   };
 
   handlerExists = function(host, page, func, name) {
-    return this.equal(func, pageHandlers.get("" + page + "." + host + "." + name));
+    var exists, handler;
+    handler = pageHandlers.get("" + page + "." + host + "." + name);
+    if (this.hasProp("id", handler) || this.hasProp("id", func)) {
+      exists = func.id === handler.id;
+    } else {
+      exists = this.equal(func, handler);
+    }
+    return exists;
   };
 
   pushSeq = function(page, type, name) {
@@ -77,14 +84,18 @@
     return seq.push(name);
   };
 
-  deleteHandler = function(host, handlerName) {
-    var error;
+  deleteHandler = function(page, type, name) {
+    var error, host;
+    host = pageHandlers.storage[page][type];
     try {
-      delete host[handlerName];
+      delete host[name];
     } catch (_error) {
       error = _error;
-      host[handlerName] = void 0;
+      host[name] = void 0;
     }
+    sequence[page][type] = this.filter(sequence[page][type], function(handlerName) {
+      return handlerName !== name;
+    });
   };
 
   addHandlers = function(host, page, func, once) {
@@ -121,17 +132,19 @@
     var handlers, _ref2;
     handlers = (_ref2 = pageHandlers.storage[page]) != null ? _ref2[type] : void 0;
     if (handlers) {
-      return this.each(sequence[page][type], function(handlerName) {
-        var handler;
-        handler = handlers[handlerName];
-        if (callback) {
-          callback();
-        }
-        handler();
-        if (handler.execOnce) {
-          return deleteHandler(handlers, handlerName);
-        }
-      });
+      return this.each(sequence[page][type], (function(_this) {
+        return function(handlerName) {
+          var handler;
+          handler = handlers[handlerName];
+          if (callback) {
+            callback();
+          }
+          handler();
+          if (handler.execOnce) {
+            return deleteHandler.apply(_this, [page, type, handlerName]);
+          }
+        };
+      })(this));
     }
   };
 
@@ -241,6 +254,7 @@
       runSandbox: function() {
         $(document).on({
           "page:fetch": function() {
+            _T.destroySystemDialogs();
             return pageViaAJAX = true;
           },
           "page:load": function() {
