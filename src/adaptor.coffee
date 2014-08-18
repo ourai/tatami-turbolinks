@@ -50,10 +50,17 @@ toNS = ( str ) ->
   return str.replace "-", "_"
 
 handlerName = ( func ) ->
-  return func.toString().length.toString(16) + ""
+  return (if func.id? then "#{func.id}_" else "") + func.toString().length.toString(16)
 
 handlerExists = ( host, page, func, name ) ->
-  return @equal func, pageHandlers.get "#{page}.#{host}.#{name}"
+  handler = pageHandlers.get "#{page}.#{host}.#{name}"
+
+  if @hasProp("id", handler) or @hasProp("id", func)
+    exists = func.id is handler.id
+  else
+    exists = @equal func, handler
+  
+  return exists
 
 # 将函数名称添加到执行队列中
 pushSeq = ( page, type, name ) ->
@@ -224,6 +231,7 @@ if _T.hasProp "supported", @Turbolinks
     runSandbox: ->
       $(document).on
         "page:fetch": ->
+          _T.destroySystemDialogs()
           pageViaAJAX = true
         "page:load": ->
           pageViaAJAX = false
