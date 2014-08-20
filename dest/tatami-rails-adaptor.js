@@ -1,5 +1,5 @@
 (function() {
-  var addHandlers, currentPage, currentPageFlag, deleteHandler, execution, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
+  var addHandlers, currentPage, currentPageFlag, deleteHandler, execution, handlerArgs, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
 
   if (Tatami.isPlainObject((_ref = Tatami.adaptor) != null ? _ref.rails : void 0)) {
     return false;
@@ -42,7 +42,7 @@
         loaded++;
         this.setAttribute("data-loaded", true);
         if (loaded === scripts) {
-          return runHandlers.apply(_T, [currentPageFlag(true), "ready"]);
+          return runHandlers(currentPageFlag(true), "ready");
         }
       };
       return Node.prototype.insertBefore = function(node) {
@@ -67,17 +67,17 @@
   handlerExists = function(host, page, func, name) {
     var exists, handler;
     handler = pageHandlers.get("" + page + "." + host + "." + name);
-    if (this.hasProp("id", handler) || this.hasProp("id", func)) {
+    if (_T.hasProp("id", handler) || _T.hasProp("id", func)) {
       exists = func.id === handler.id;
     } else {
-      exists = this.equal(func, handler);
+      exists = _T.equal(func, handler);
     }
     return exists;
   };
 
   pushSeq = function(page, type, name) {
     var seq;
-    seq = this.namespace(sequence, "" + page + "." + type);
+    seq = _T.namespace(sequence, "" + page + "." + type);
     if (seq == null) {
       seq = sequence[page][type] = [];
     }
@@ -93,38 +93,44 @@
       error = _error;
       host[name] = void 0;
     }
-    sequence[page][type] = this.filter(sequence[page][type], function(handlerName) {
+    sequence[page][type] = _T.filter(sequence[page][type], function(handlerName) {
       return handlerName !== name;
     });
   };
 
+  handlerArgs = function(type, args) {
+    var once, page;
+    page = args[1];
+    once = _T.isBoolean(page) ? page : args[2];
+    page = (page != null) && _T.isString(page) ? toNS(page) : currentPage;
+    return [type, [page], args[0], once];
+  };
+
   addHandlers = function(host, page, func, once) {
     var handlers, isPlain;
-    isPlain = this.isPlainObject(page);
+    isPlain = _T.isPlainObject(page);
     handlers = {};
-    this.each(page, (function(_this) {
-      return function(flag, idx) {
-        var name;
-        if (isPlain) {
-          func = flag;
-          flag = idx;
-        }
-        if (once) {
-          func.execOnce = true;
-        }
-        if (flag == null) {
-          flag = "unspecified";
-        }
-        flag = toNS(flag);
-        name = handlerName(func);
-        if (!handlerExists.apply(_this, [host, flag, func, name])) {
-          _this.namespace(handlers, "" + flag + "." + host + "." + name);
-          handlers[flag][host][name] = func;
-          pushSeq.apply(_this, [flag, host, name]);
-        }
-        return true;
-      };
-    })(this));
+    _T.each(page, function(flag, idx) {
+      var name;
+      if (isPlain) {
+        func = flag;
+        flag = idx;
+      }
+      if (once) {
+        func.execOnce = true;
+      }
+      if (flag == null) {
+        flag = "unspecified";
+      }
+      flag = toNS(flag);
+      name = handlerName(func);
+      if (!handlerExists(host, flag, func, name)) {
+        _T.namespace(handlers, "" + flag + "." + host + "." + name);
+        handlers[flag][host][name] = func;
+        pushSeq(flag, host, name);
+      }
+      return true;
+    });
     return pageHandlers.set(handlers);
   };
 
@@ -132,19 +138,17 @@
     var handlers, _ref2;
     handlers = (_ref2 = pageHandlers.storage[page]) != null ? _ref2[type] : void 0;
     if (handlers) {
-      return this.each(sequence[page][type], (function(_this) {
-        return function(handlerName) {
-          var handler;
-          handler = handlers[handlerName];
-          if (callback) {
-            callback();
-          }
-          handler();
-          if (handler.execOnce) {
-            return deleteHandler.apply(_this, [page, type, handlerName]);
-          }
-        };
-      })(this));
+      return _T.each(sequence[page][type], function(handlerName) {
+        var handler;
+        handler = handlers[handlerName];
+        if (callback) {
+          callback();
+        }
+        handler();
+        if (handler.execOnce) {
+          return deleteHandler(page, type, handlerName);
+        }
+      });
     }
   };
 
@@ -156,15 +160,13 @@
     if (type === "prepare" || !turbolinksEnabled || !pageViaAJAX || scripts.size() === 0) {
       pages.push(flag);
     }
-    return this.each(pages, (function(_this) {
-      return function(page) {
-        return runHandlers.apply(_this, [page, type]);
-      };
-    })(this));
+    return _T.each(pages, function(page) {
+      return runHandlers(page, type);
+    });
   };
 
   runPageHandlers = function(page, func, isPlain) {
-    return this.each(page, function(flag, idx) {
+    return _T.each(page, function(flag, idx) {
       if (isPlain) {
         func = flag;
         flag = idx;
@@ -234,38 +236,36 @@
 
   if (_T.hasProp("supported", this.Turbolinks)) {
     _T.mixin({
-      prepare: function(handler) {
-        addHandlers.apply(this, ["prepare", [currentPage], handler]);
+      prepare: function() {
+        addHandlers.apply(this, handlerArgs("prepare", arguments));
       },
-      ready: function(handler, page, once) {
-        addHandlers.apply(this, ["ready", [page != null ? toNS(page) : currentPage], handler, once]);
+      ready: function() {
+        addHandlers.apply(this, handlerArgs("ready", arguments));
       }
     });
     runAllHandlers = function() {
       var page;
       page = currentPageFlag(true);
-      runHandlers.call(this, page, "init", function() {
+      runHandlers(page, "init", function() {
         return currentPage = page;
       });
-      runFlowHandlers.call(this, "prepare");
-      return runFlowHandlers.call(this, "ready");
+      runFlowHandlers("prepare");
+      return runFlowHandlers("ready");
     };
     _T.init({
       runSandbox: function() {
         $(document).on({
           "page:fetch": function() {
-            _T.destroySystemDialogs();
-            return pageViaAJAX = true;
+            pageViaAJAX = true;
+            return _T.destroySystemDialogs();
           },
           "page:load": function() {
             return pageViaAJAX = false;
           }
         });
-        return $(document).ready((function(_this) {
-          return function() {
-            return runAllHandlers.call(_this);
-          };
-        })(this));
+        return $(document).ready(function() {
+          return runAllHandlers();
+        });
       }
     });
   }

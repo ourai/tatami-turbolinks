@@ -36,7 +36,7 @@ if turbolinksEnabled
     onload = ->
       loaded++
       @setAttribute "data-loaded", true
-      runHandlers.apply(_T, [currentPageFlag(true), "ready"]) if loaded is scripts
+      runHandlers(currentPageFlag(true), "ready") if loaded is scripts
 
     Node::insertBefore = ( node ) ->
       if node.tagName.toLowerCase() is "script" and _T.data(node)["inside"]
@@ -55,22 +55,18 @@ handlerName = ( func ) ->
 handlerExists = ( host, page, func, name ) ->
   handler = pageHandlers.get "#{page}.#{host}.#{name}"
 
-  if @hasProp("id", handler) or @hasProp("id", func)
+  if _T.hasProp("id", handler) or _T.hasProp("id", func)
     exists = func.id is handler.id
   else
-    exists = @equal func, handler
+    exists = _T.equal func, handler
   
   return exists
 
 # 将函数名称添加到执行队列中
 pushSeq = ( page, type, name ) ->
-  seq = @namespace sequence, "#{page}.#{type}"
+  seq = _T.namespace sequence, "#{page}.#{type}"
   seq = sequence[page][type] = [] if not seq?
   seq.push name
-
-# handlerStatus = ( page, type, name ) ->
-#   exec = @namespace execution, "#{page}.#{type}.#{name}"
-#   execution[page][type][name] = false if exec is null
 
 deleteHandler = ( page, type, name ) ->
   host = pageHandlers.storage[page][type]
@@ -80,23 +76,23 @@ deleteHandler = ( page, type, name ) ->
   catch error
     host[name] = undefined
 
-  sequence[page][type] = @filter sequence[page][type], ( handlerName ) ->
+  sequence[page][type] = _T.filter sequence[page][type], ( handlerName ) ->
     return handlerName isnt name
 
   return
 
 handlerArgs = ( type, args ) ->
   page = args[1]
-  once = if @isBoolean(page) then page else args[2]
-  page = if page? and @isString(page) then toNS(page) else currentPage
+  once = if _T.isBoolean(page) then page else args[2]
+  page = if page? and _T.isString(page) then toNS(page) else currentPage
 
   return [type, [page], args[0], once]
 
 addHandlers = ( host, page, func, once ) ->
-  isPlain = @isPlainObject page
+  isPlain = _T.isPlainObject page
   handlers = {}
 
-  @each page, ( flag, idx ) =>
+  _T.each page, ( flag, idx ) ->
     if isPlain
       func = flag
       flag = idx
@@ -108,11 +104,10 @@ addHandlers = ( host, page, func, once ) ->
     flag = toNS flag
     name = handlerName func
 
-    if not handlerExists.apply this, [host, flag, func, name]
-      @namespace handlers, "#{flag}.#{host}.#{name}"
+    if not handlerExists host, flag, func, name
+      _T.namespace handlers, "#{flag}.#{host}.#{name}"
       handlers[flag][host][name] = func
-      pushSeq.apply this, [flag, host, name]
-      # handlerStatus.apply this, [flag, host, name]
+      pushSeq flag, host, name
 
     return true
 
@@ -123,19 +118,13 @@ runHandlers = ( page, type, callback ) ->
   handlers = pageHandlers.storage[page]?[type]
 
   if handlers
-    # statuses = execution[page][type]
-
-    @each sequence[page][type], ( handlerName ) =>
+    _T.each sequence[page][type], ( handlerName ) ->
       handler = handlers[handlerName]
 
       callback() if callback
 
       handler()
-      deleteHandler.apply(this, [page, type, handlerName]) if handler.execOnce
-      
-      # if page is "unspecified" or statuses[handlerName] is false
-      #   statuses[handlerName] = true
-      #   handlers[handlerName]()
+      deleteHandler(page, type, handlerName) if handler.execOnce
 
 # 执行流程控制函数
 runFlowHandlers = ( type ) ->
@@ -146,12 +135,12 @@ runFlowHandlers = ( type ) ->
   if type is "prepare" or not turbolinksEnabled or not pageViaAJAX or scripts.size() is 0
     pages.push flag
 
-  @each pages, ( page ) =>
-    runHandlers.apply this, [page, type]
+  _T.each pages, ( page ) ->
+    runHandlers page, type
 
 # 执行页面指定初始化函数
 runPageHandlers = ( page, func, isPlain ) ->
-  @each page, ( flag, idx ) ->
+  _T.each page, ( flag, idx ) ->
     if isPlain
       func = flag
       flag = idx
@@ -216,10 +205,10 @@ _T.extend
 if _T.hasProp "supported", @Turbolinks
   _T.mixin
     prepare: ->
-      addHandlers.apply this, handlerArgs.call this, "prepare", arguments
+      addHandlers.apply this, handlerArgs("prepare", arguments)
       return 
     ready: ->
-      addHandlers.apply this, handlerArgs.call this, "ready", arguments
+      addHandlers.apply this, handlerArgs("ready", arguments)
       return
 
   runAllHandlers = ->
@@ -228,11 +217,11 @@ if _T.hasProp "supported", @Turbolinks
 
     # 执行 init 函数队列
     # 过程中会添加页面指定的 prepare、ready 函数
-    runHandlers.call this, page, "init", ->
+    runHandlers page, "init", ->
       currentPage = page
 
-    runFlowHandlers.call this, "prepare"
-    runFlowHandlers.call this, "ready"
+    runFlowHandlers "prepare"
+    runFlowHandlers "ready"
 
   _T.init
     runSandbox: ->
@@ -243,5 +232,5 @@ if _T.hasProp "supported", @Turbolinks
         "page:load": ->
           pageViaAJAX = false
 
-      $(document).ready =>
-        runAllHandlers.call this
+      $(document).ready ->
+        runAllHandlers()
