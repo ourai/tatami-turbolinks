@@ -6,6 +6,7 @@ module.exports = ( grunt ) ->
   npmTasks = [
       "grunt-contrib-coffee"
       "grunt-contrib-uglify"
+      "grunt-contrib-copy"
     ]
 
   grunt.initConfig
@@ -36,8 +37,14 @@ module.exports = ( grunt ) ->
       build:
         src: "<%= meta.dest %>/<%= pkg.name %>.js"
         dest: "<%= meta.dest %>/<%= pkg.name %>.min.js"
+    copy:
+      test:
+        expand: true
+        cwd: "<%= meta.dest %>"
+        src: ["**.js"]
+        dest: "test"
 
   grunt.loadNpmTasks task for task in npmTasks
 
-  grunt.registerTask "script", ["coffee", "uglify"]
+  grunt.registerTask "script", ["coffee", "uglify", "copy"]
   grunt.registerTask "default", ["script"]
