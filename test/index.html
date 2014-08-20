@@ -1,11 +1,36 @@
 <!DOCTYPE html>
 <html>
-  <meta charset="UTF-8">
-  <title>Test</title>
-  <script src="./jquery.js"></script>
-  <script src="./tatami.js"></script>
-  <script src="./tatami-rails-adaptor.js"></script>
-  <script>
-    Tatami.sandbox();
-  </script>
+  <head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+    <script>
+      window.Turbolinks = {
+        supported: true
+      };
+    </script>
+    <script src="./jquery.js"></script>
+    <script src="./tatami.js"></script>
+    <script src="./tatami-rails-adaptor.js"></script>
+  </head>
+  <body data-page="test-adaptor">
+    <script>
+      Tatami.prepare(function() {
+        console.log("Prepare A!");
+      });
+
+      Tatami.prepare(function() {
+        console.log("Prepare B!");
+      });
+
+      Tatami.prepare(function() {
+        console.log("Prepare C!");
+      });
+
+      Tatami.ready(function() {
+        console.log("Ready!!!");
+      });
+
+      Tatami.sandbox();
+    </script>
+  </body>
 </html>

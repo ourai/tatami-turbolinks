@@ -1,5 +1,5 @@
 (function() {
-  var addHandlers, currentPage, currentPageFlag, deleteHandler, execution, handlerArgs, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
+  var addHandlers, counter, currentPage, currentPageFlag, deleteHandler, handlerArgs, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
 
   if (Tatami.isPlainObject((_ref = Tatami.adaptor) != null ? _ref.rails : void 0)) {
     return false;
@@ -11,7 +11,7 @@
 
   sequence = {};
 
-  execution = {};
+  counter = {};
 
   currentPage = void 0;
 
@@ -26,7 +26,7 @@
           enabled: turbolinksEnabled,
           handlers: pageHandlers.storage,
           sequence: sequence,
-          execution: execution
+          counter: counter
         }
       }
     }
@@ -60,19 +60,32 @@
     return str.replace("-", "_");
   };
 
-  handlerName = function(func) {
-    return (func.id != null ? "" + func.id + "_" : "") + func.toString().length.toString(16);
-  };
-
   handlerExists = function(host, page, func, name) {
-    var exists, handler;
-    handler = pageHandlers.get("" + page + "." + host + "." + name);
-    if (_T.hasProp("id", handler) || _T.hasProp("id", func)) {
-      exists = func.id === handler.id;
-    } else {
-      exists = _T.equal(func, handler);
+    var exists, handlers;
+    handlers = pageHandlers.get("" + page + "." + host + "." + name);
+    exists = false;
+    if (handlers != null) {
+      _T.each(handlers, function(h, n) {
+        if (_T.hasProp("id", h) || _T.hasProp("id", func)) {
+          exists = func.id === h.id;
+        } else {
+          exists = _T.equal(func, h);
+        }
+        return !exists;
+      });
     }
     return exists;
+  };
+
+  handlerName = function(host, page, func) {
+    var key, name, _ref2;
+    key = (func.id != null ? "" + func.id + "_" : "") + func.toString().length.toString(16);
+    _T.namespace(counter, key);
+    if (!handlerExists(host, page, func, key)) {
+      counter[key] = ((_ref2 = counter[key]) != null ? _ref2 : 0) + 1;
+      name = "" + key + "." + counter[key];
+    }
+    return name;
   };
 
   pushSeq = function(page, type, name) {
@@ -85,13 +98,14 @@
   };
 
   deleteHandler = function(page, type, name) {
-    var error, host;
+    var error, host, part;
     host = pageHandlers.storage[page][type];
+    part = name.split(".");
     try {
-      delete host[name];
+      delete host[part[0]][part[1]];
     } catch (_error) {
       error = _error;
-      host[name] = void 0;
+      host[part[0]][part[1]] = void 0;
     }
     sequence[page][type] = _T.filter(sequence[page][type], function(handlerName) {
       return handlerName !== name;
@@ -111,7 +125,7 @@
     isPlain = _T.isPlainObject(page);
     handlers = {};
     _T.each(page, function(flag, idx) {
-      var name;
+      var name, part;
       if (isPlain) {
         func = flag;
         flag = idx;
@@ -123,10 +137,11 @@
         flag = "unspecified";
       }
       flag = toNS(flag);
-      name = handlerName(func);
-      if (!handlerExists(host, flag, func, name)) {
+      name = handlerName(host, flag, func);
+      if (name != null) {
         _T.namespace(handlers, "" + flag + "." + host + "." + name);
-        handlers[flag][host][name] = func;
+        part = name.split(".");
+        handlers[flag][host][part[0]][part[1]] = func;
         pushSeq(flag, host, name);
       }
       return true;
@@ -139,8 +154,9 @@
     handlers = (_ref2 = pageHandlers.storage[page]) != null ? _ref2[type] : void 0;
     if (handlers) {
       return _T.each(sequence[page][type], function(handlerName) {
-        var handler;
-        handler = handlers[handlerName];
+        var handler, part;
+        part = handlerName.split(".");
+        handler = handlers[part[0]][part[1]];
         if (callback) {
           callback();
         }

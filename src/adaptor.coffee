@@ -13,7 +13,7 @@ _T = Tatami
 # storage for page handlers
 pageHandlers = new _T.__class__.Storage "pageHandlers"
 sequence = {}
-execution = {}
+counter = {}
 
 currentPage = undefined
 turbolinksEnabled = @Turbolinks?.supported is true
@@ -23,7 +23,7 @@ pageViaAJAX = false
 _T.mixin
   adaptor:
     rails:
-      turbolinks: {enabled: turbolinksEnabled, handlers: pageHandlers.storage, sequence, execution}
+      turbolinks: {enabled: turbolinksEnabled, handlers: pageHandlers.storage, sequence, counter}
 
 if turbolinksEnabled
   # 监控动态插入的 <script>
@@ -49,18 +49,31 @@ if turbolinksEnabled
 toNS = ( str ) ->
   return str.replace "-", "_"
 
-handlerName = ( func ) ->
-  return (if func.id? then "#{func.id}_" else "") + func.toString().length.toString(16)
-
 handlerExists = ( host, page, func, name ) ->
-  handler = pageHandlers.get "#{page}.#{host}.#{name}"
+  handlers = pageHandlers.get "#{page}.#{host}.#{name}"
+  exists = false
 
-  if _T.hasProp("id", handler) or _T.hasProp("id", func)
-    exists = func.id is handler.id
-  else
-    exists = _T.equal func, handler
-  
+  if handlers?
+    _T.each handlers, ( h, n ) ->
+      if _T.hasProp("id", h) or _T.hasProp("id", func)
+        exists = func.id is h.id
+      else
+        exists = _T.equal func, h
+
+      return not exists
+
   return exists
+
+handlerName = ( host, page, func ) ->
+  key = (if func.id? then "#{func.id}_" else "") + func.toString().length.toString(16)
+
+  _T.namespace counter, key
+
+  if not handlerExists host, page, func, key
+    counter[key] = (counter[key] ? 0) + 1
+    name = "#{key}.#{counter[key]}"
+
+  return name
 
 # 将函数名称添加到执行队列中
 pushSeq = ( page, type, name ) ->
@@ -70,11 +83,12 @@ pushSeq = ( page, type, name ) ->
 
 deleteHandler = ( page, type, name ) ->
   host = pageHandlers.storage[page][type]
+  part = name.split "."
 
   try
-    delete host[name]
+    delete host[part[0]][part[1]]
   catch error
-    host[name] = undefined
+    host[part[0]][part[1]] = undefined
 
   sequence[page][type] = _T.filter sequence[page][type], ( handlerName ) ->
     return handlerName isnt name
@@ -102,11 +116,14 @@ addHandlers = ( host, page, func, once ) ->
 
     flag = "unspecified" if not flag?
     flag = toNS flag
-    name = handlerName func
+    name = handlerName host, flag, func
 
-    if not handlerExists host, flag, func, name
+    if name?
       _T.namespace handlers, "#{flag}.#{host}.#{name}"
-      handlers[flag][host][name] = func
+
+      part = name.split "."
+      handlers[flag][host][part[0]][part[1]] = func
+
       pushSeq flag, host, name
 
     return true
@@ -119,7 +136,8 @@ runHandlers = ( page, type, callback ) ->
 
   if handlers
     _T.each sequence[page][type], ( handlerName ) ->
-      handler = handlers[handlerName]
+      part = handlerName.split "."
+      handler = handlers[part[0]][part[1]]
 
       callback() if callback
 
