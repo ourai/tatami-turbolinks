@@ -85,6 +85,13 @@ deleteHandler = ( page, type, name ) ->
 
   return
 
+handlerArgs = ( type, args ) ->
+  page = args[1]
+  once = if @isBoolean(page) then page else args[2]
+  page = if page? and @isString(page) then toNS(page) else currentPage
+
+  return [type, [page], args[0], once]
+
 addHandlers = ( host, page, func, once ) ->
   isPlain = @isPlainObject page
   handlers = {}
@@ -208,11 +215,11 @@ _T.extend
 # Support for turbolinks (https://github.com/rails/turbolinks)
 if _T.hasProp "supported", @Turbolinks
   _T.mixin
-    prepare: ( handler ) ->
-      addHandlers.apply this, ["prepare", [currentPage], handler]
+    prepare: ->
+      addHandlers.apply this, handlerArgs.call this, "prepare", arguments
       return 
-    ready: ( handler, page, once ) ->
-      addHandlers.apply this, ["ready", [if page? then toNS(page) else currentPage], handler, once]
+    ready: ->
+      addHandlers.apply this, handlerArgs.call this, "ready", arguments
       return
 
   runAllHandlers = ->
@@ -231,8 +238,8 @@ if _T.hasProp "supported", @Turbolinks
     runSandbox: ->
       $(document).on
         "page:fetch": ->
-          _T.destroySystemDialogs()
           pageViaAJAX = true
+          _T.destroySystemDialogs()
         "page:load": ->
           pageViaAJAX = false
 
