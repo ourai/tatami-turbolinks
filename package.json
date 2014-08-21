@@ -1,6 +1,6 @@
 {
   "name": "tatami-rails-adaptor",
-  "version": "0.1.0",
+  "version": "0.1.8",
   "description": "An adaptor for Ruby on Rails to make Tatami more GRACEFULL",
   "keywords": [
     "tatami",
