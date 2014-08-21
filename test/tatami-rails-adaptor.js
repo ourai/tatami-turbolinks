@@ -1,7 +1,16 @@
-(function() {
-  var addHandlers, counter, currentPage, currentPageFlag, deleteHandler, handlerArgs, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref, _ref1;
 
-  if (Tatami.isPlainObject((_ref = Tatami.adaptor) != null ? _ref.rails : void 0)) {
+/*
+ * ----------
+ * Adaptor of Tatami for Ruby on Rails
+ * ----------
+ *= require jquery.turbolinks
+ *= require ./tatami
+ */
+
+(function() {
+  var addHandlers, counter, currentPage, currentPageFlag, deleteHandler, handlerArgs, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref;
+
+  if (Tatami.isPlainObject(Tatami.rails)) {
     return false;
   }
 
@@ -15,19 +24,17 @@
 
   currentPage = void 0;
 
-  turbolinksEnabled = ((_ref1 = this.Turbolinks) != null ? _ref1.supported : void 0) === true;
+  turbolinksEnabled = ((_ref = this.Turbolinks) != null ? _ref.supported : void 0) === true;
 
   pageViaAJAX = false;
 
   _T.mixin({
-    adaptor: {
-      rails: {
-        turbolinks: {
-          enabled: turbolinksEnabled,
-          handlers: pageHandlers.storage,
-          sequence: sequence,
-          counter: counter
-        }
+    rails: {
+      turbolinks: {
+        enabled: turbolinksEnabled,
+        handlers: pageHandlers.storage,
+        sequence: sequence,
+        counter: counter
       }
     }
   });
@@ -78,11 +85,11 @@
   };
 
   handlerName = function(host, page, func) {
-    var key, name, _ref2;
+    var key, name, _ref1;
     key = (func.id != null ? "" + func.id + "_" : "") + func.toString().length.toString(16);
     _T.namespace(counter, key);
     if (!handlerExists(host, page, func, key)) {
-      counter[key] = ((_ref2 = counter[key]) != null ? _ref2 : 0) + 1;
+      counter[key] = ((_ref1 = counter[key]) != null ? _ref1 : 0) + 1;
       name = "" + key + "." + counter[key];
     }
     return name;
@@ -150,8 +157,8 @@
   };
 
   runHandlers = function(page, type, callback) {
-    var handlers, _ref2;
-    handlers = (_ref2 = pageHandlers.storage[page]) != null ? _ref2[type] : void 0;
+    var handlers, _ref1;
+    handlers = (_ref1 = pageHandlers.storage[page]) != null ? _ref1[type] : void 0;
     if (handlers) {
       return _T.each(sequence[page][type], function(handlerName) {
         var handler, part;

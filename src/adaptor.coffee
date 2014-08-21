@@ -1,11 +1,12 @@
-##
+###
 # ----------
 # Adaptor of Tatami for Ruby on Rails
 # ----------
 #= require jquery.turbolinks
 #= require ./tatami
+###
 
-if Tatami.isPlainObject Tatami.adaptor?.rails
+if Tatami.isPlainObject Tatami.rails
   return false
 
 _T = Tatami
@@ -21,9 +22,8 @@ turbolinksEnabled = @Turbolinks?.supported is true
 pageViaAJAX = false
 
 _T.mixin
-  adaptor:
-    rails:
-      turbolinks: {enabled: turbolinksEnabled, handlers: pageHandlers.storage, sequence, counter}
+  rails:
+    turbolinks: {enabled: turbolinksEnabled, handlers: pageHandlers.storage, sequence, counter}
 
 if turbolinksEnabled
   # 监控动态插入的 <script>
