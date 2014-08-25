@@ -216,6 +216,35 @@ _T.extend
         return @isString(page) or @isArray(page) or @isPlainObject(page)
 
       value: false
+    },
+    {
+      ###
+      # 用于 widget 中执行指定函数
+      #
+      # @method   runInWidget
+      # @return
+      ###
+      name: "runInWidget"
+
+      handler: ->
+        args = @slice arguments
+        funcName = args[0]
+
+        if @isFunction funcName
+          callback = funcName
+          args = @slice args, 1
+          funcName = args[0]
+
+        if @functionExists funcName
+          @run.apply this, args
+        else
+          handler = =>
+            callback() if callback
+            @run.apply this, args
+
+          handler.id = funcName
+
+          @ready handler, $("body").data("page"), true
     }
   ]
 

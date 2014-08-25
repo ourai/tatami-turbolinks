@@ -253,6 +253,39 @@
           return this.isString(page) || this.isArray(page) || this.isPlainObject(page);
         },
         value: false
+      }, {
+
+        /*
+         * 用于 widget 中执行指定函数
+         *
+         * @method   runInWidget
+         * @return
+         */
+        name: "runInWidget",
+        handler: function() {
+          var args, callback, funcName, handler;
+          args = this.slice(arguments);
+          funcName = args[0];
+          if (this.isFunction(funcName)) {
+            callback = funcName;
+            args = this.slice(args, 1);
+            funcName = args[0];
+          }
+          if (this.functionExists(funcName)) {
+            return this.run.apply(this, args);
+          } else {
+            handler = (function(_this) {
+              return function() {
+                if (callback) {
+                  callback();
+                }
+                return _this.run.apply(_this, args);
+              };
+            })(this);
+            handler.id = funcName;
+            return this.ready(handler, $("body").data("page"), true);
+          }
+        }
       }
     ]
   });

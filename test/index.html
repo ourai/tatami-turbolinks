@@ -11,8 +11,6 @@
     <script src="./jquery.js"></script>
     <script src="./tatami.js"></script>
     <script src="./tatami-rails-adaptor.js"></script>
-  </head>
-  <body data-page="test-adaptor">
     <script>
       Tatami.prepare(function() {
         console.log("Prepare A!");
@@ -31,6 +29,19 @@
       });
 
       Tatami.sandbox();
+
+      Tatami.queue("run", function() {
+        console.log("Run!");
+      });
+
+      Tatami.runInWidget("run");
+      Tatami.runInWidget("runInWidget");
+
+      Tatami.queue("runInWidget", function() {
+        console.log("Run in the widget!");
+      });
     </script>
+  </head>
+  <body data-page="test-adaptor">
   </body>
 </html>
