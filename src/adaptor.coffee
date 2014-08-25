@@ -39,7 +39,7 @@ if turbolinksEnabled
       runHandlers(currentPageFlag(true), "ready") if loaded is scripts
 
     Node::insertBefore = ( node ) ->
-      if node.tagName.toLowerCase() is "script" and _T.data(node)["inside"]
+      if node.nodeType is 1 and node.tagName.toLowerCase() is "script" and _T.data(node)["inside"]
         scripts++
         node.async = false
         node.onload = onload

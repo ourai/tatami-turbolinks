@@ -53,7 +53,7 @@
         }
       };
       return Node.prototype.insertBefore = function(node) {
-        if (node.tagName.toLowerCase() === "script" && _T.data(node)["inside"]) {
+        if (node.nodeType === 1 && node.tagName.toLowerCase() === "script" && _T.data(node)["inside"]) {
           scripts++;
           node.async = false;
           node.onload = onload;
