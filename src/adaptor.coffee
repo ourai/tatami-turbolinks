@@ -250,6 +250,62 @@ _T.extend
 
 # Support for turbolinks (https://github.com/rails/turbolinks)
 if _T.hasProp "supported", @Turbolinks
+  _data = _T.data
+
+  getDataCache = ->
+    return $("body").data("#{_T.__meta__.name}.cache") ? {}
+
+  setDataCache = ( data ) ->
+    $("body").data "#{_T.__meta__.name}.cache", data
+
+    return data
+
+  getCachedData = ( ns_str ) ->
+    parts = ns_str.split "."
+    result = getDataCache()
+
+    _T.each parts, ( part ) ->
+      rv = _T.hasProp part, result
+      result = result[part]
+
+      return rv
+
+    return result
+
+  setStorageData = ( ns_str, data ) ->
+    parts = ns_str.split "."
+    length = parts.length
+    isObj = _T.isPlainObject data
+    cache = getDataCache()
+
+    if length is 1
+      key = parts[0]
+      result = setData cache, key, data, _T.hasProp(key, cache)
+    else
+      result = cache
+
+      _T.each parts, ( n, i ) ->
+        if i < length - 1
+          result[n] = {} if not _T.hasProp(n, result)
+        else
+          result[n] = setData result, n, data, _T.isPlainObject result[n]
+
+        result = result[n]
+
+        return true
+
+    setDataCache cache
+
+    return result
+
+  setData = ( target, key, data, condition ) ->
+    if condition && _T.isPlainObject data
+      $.extend true, target[key], data
+    else
+      target[key] = data
+
+    return target[key]
+
   _T.mixin
     prepare: ->
       addHandlers.apply this, handlerArgs("prepare", arguments)
@@ -257,6 +313,17 @@ if _T.hasProp "supported", @Turbolinks
     ready: ->
       addHandlers.apply this, handlerArgs("ready", arguments)
       return
+    data: ->
+      args = arguments
+      length = args.length
+      target = args[0]
+
+      if length > 0 and @isString(target) and /^[0-9A-Z_.]+[^_.]?$/i.test(target)
+        result = if length is 1 then getCachedData(target) else setCachedData(target, args[1])
+      else
+        result = _data.apply @, @slice args
+
+      return result ? null
 
   runAllHandlers = ->
     # console.log "Run! Run!! Run!!!"

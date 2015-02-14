@@ -8,7 +8,7 @@
  */
 
 (function() {
-  var addHandlers, counter, currentPage, currentPageFlag, deleteHandler, handlerArgs, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, toNS, turbolinksEnabled, _T, _ref;
+  var addHandlers, counter, currentPage, currentPageFlag, deleteHandler, getCachedData, getDataCache, handlerArgs, handlerExists, handlerName, pageHandlers, pageViaAJAX, pushSeq, runAllHandlers, runFlowHandlers, runHandlers, runPageHandlers, sequence, setData, setDataCache, setStorageData, toNS, turbolinksEnabled, _T, _data, _ref;
 
   if (Tatami.isPlainObject(Tatami.rails)) {
     return false;
@@ -291,12 +291,79 @@
   });
 
   if (_T.hasProp("supported", this.Turbolinks)) {
+    _data = _T.data;
+    getDataCache = function() {
+      var _ref1;
+      return (_ref1 = $("body").data("" + _T.__meta__.name + ".cache")) != null ? _ref1 : {};
+    };
+    setDataCache = function(data) {
+      $("body").data("" + _T.__meta__.name + ".cache", data);
+      return data;
+    };
+    getCachedData = function(ns_str) {
+      var parts, result;
+      parts = ns_str.split(".");
+      result = getDataCache();
+      _T.each(parts, function(part) {
+        var rv;
+        rv = _T.hasProp(part, result);
+        result = result[part];
+        return rv;
+      });
+      return result;
+    };
+    setStorageData = function(ns_str, data) {
+      var cache, isObj, key, length, parts, result;
+      parts = ns_str.split(".");
+      length = parts.length;
+      isObj = _T.isPlainObject(data);
+      cache = getDataCache();
+      if (length === 1) {
+        key = parts[0];
+        result = setData(cache, key, data, _T.hasProp(key, cache));
+      } else {
+        result = cache;
+        _T.each(parts, function(n, i) {
+          if (i < length - 1) {
+            if (!_T.hasProp(n, result)) {
+              result[n] = {};
+            }
+          } else {
+            result[n] = setData(result, n, data, _T.isPlainObject(result[n]));
+          }
+          result = result[n];
+          return true;
+        });
+      }
+      setDataCache(cache);
+      return result;
+    };
+    setData = function(target, key, data, condition) {
+      if (condition && _T.isPlainObject(data)) {
+        $.extend(true, target[key], data);
+      } else {
+        target[key] = data;
+      }
+      return target[key];
+    };
     _T.mixin({
       prepare: function() {
         addHandlers.apply(this, handlerArgs("prepare", arguments));
       },
       ready: function() {
         addHandlers.apply(this, handlerArgs("ready", arguments));
+      },
+      data: function() {
+        var args, length, result, target;
+        args = arguments;
+        length = args.length;
+        target = args[0];
+        if (length > 0 && this.isString(target) && /^[0-9A-Z_.]+[^_.]?$/i.test(target)) {
+          result = length === 1 ? getCachedData(target) : setCachedData(target, args[1]);
+        } else {
+          result = _data.apply(this, this.slice(args));
+        }
+        return result != null ? result : null;
       }
     });
     runAllHandlers = function() {
