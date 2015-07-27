@@ -1,6 +1,6 @@
 ###
 # ----------
-# Adaptor of Tatami for Ruby on Rails
+# Adaptor of Tatami for Turbolinks (Ruby on Rails)
 # ----------
 #= require jquery.turbolinks
 #= require ./tatami

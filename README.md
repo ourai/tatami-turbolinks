@@ -1,4 +1,3 @@
-tatami-rails-adaptor
-====================
+# Tatami Turbolinks
 
-An adaptor for Ruby on Rails to make Tatami more GRACEFULL
+An adaptor for Turbolinks (Ruby on Rails)

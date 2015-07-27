@@ -1,5 +1,5 @@
 {
-  "name": "tatami-rails-adaptor",
+  "name": "tatami-turbolinks",
   "version": "0.1.8",
   "description": "An adaptor for Ruby on Rails to make Tatami more GRACEFULL",
   "keywords": [
@@ -10,9 +10,9 @@
   "author": "Ourai Lin <ourairyu@hotmail.com> (http://ourai.ws/)",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jsrev/tatami-rails-adaptor.git"
+    "url": "https://github.com/ourai/tatami-turbolinks.git"
   },
-  "bugs": "https://github.com/jsrev/tatami-rails-adaptor/issues",
+  "bugs": "https://github.com/ourai/tatami-turbolinks/issues",
   "engines": "node >= 0.8.0",
   "devDependencies": {
     "grunt": "~0.4.1",
